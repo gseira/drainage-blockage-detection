@@ -1,0 +1,25 @@
+data:
+  # mode: "manifest" reads directly from images/ via CSV manifest (no file copying)
+  # mode: "folder"   uses processed/ directory structure (train|val|test/blocked|clear)
+  mode: manifest
+  manifest_dir:  /homes/ges65/dissertation/data/manifests
+  processed_dir: /homes/ges65/dissertation/data/processed
+  img_size: 224
+  num_workers: 4
+
+model:
+  architecture: resnet50   # options: resnet50, efficientnet_b0
+  pretrained: true
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  seed: 42
+  pos_weight: 0.27        # = n_blocked/n_clear — down-weights clear (majority)
+  early_stopping_patience: 7
+
+paths:
+  checkpoints: /homes/ges65/dissertation/results/checkpoints
+  logs: /homes/ges65/dissertation/results/logs

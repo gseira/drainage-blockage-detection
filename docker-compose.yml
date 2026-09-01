@@ -1,0 +1,61 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    # No "ports:" here deliberately — the backend is NOT published directly
+    # to the host/internet anymore. Only the "proxy" service below (which
+    # requires a password) can reach it, via Docker's internal network on
+    # its internal container port. Same reasoning on "frontend" below.
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    volumes:
+      # Bind-mounted, not baked into the image: the checkpoint (~430MB) and
+      # the SQLite DB (currently ~19GB — see note in SETUP/chat) would make
+      # every image rebuild slow and pointless otherwise. These paths match
+      # app/main.py's own defaults (CHECKPOINT_PATH, DB_PATH), so no env
+      # overrides are needed here.
+      - ./monitoring.db:/app/monitoring.db
+      - ./results:/app/results
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Flood Watcher
+    expose:
+      - "5173"
+    environment:
+      # Reachable from the BROWSER, not from inside the frontend container —
+      # api.ts's fetch() calls run client-side, so this has to be a URL your
+      # browser can resolve, not the Docker-internal service name. A plain
+      # "/api" (relative, no host) resolves to whatever host/port/protocol
+      # the browser actually loaded the page from — works whether that's
+      # localhost, the droplet's IP, or a future domain name, with no
+      # hardcoded host to get wrong. Only override this if the API is ever
+      # served from a genuinely different origin than the page itself.
+      - VITE_API_BASE=${VITE_API_BASE:-/api}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  proxy:
+    # The only service exposed to the internet. Sits in front of both the
+    # frontend and backend and requires a username/password (HTTP Basic
+    # Auth, configured in ./Caddyfile) before letting any request through —
+    # this is the fix for "everyone with the link can access it."
+    image: caddy:2-alpine
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

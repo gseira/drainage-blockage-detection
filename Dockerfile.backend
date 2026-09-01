@@ -1,0 +1,55 @@
+# ── DrainWatch backend (FastAPI + PyTorch) ──────────────────────────────────
+#
+# Build from the repo root:   docker build -f Dockerfile.backend -t drainwatch-backend .
+# (normally done for you via docker-compose.yml instead — see that file)
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Pillow/matplotlib need a couple of system image libs; kept minimal otherwise.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libjpeg62-turbo \
+        libpng16-16 \
+    && rm -rf /var/lib/apt/lists/*
+
+# PyTorch first. On x86_64, pulled from PyTorch's own CPU-only index —
+# left off the default PyPI index, `pip install torch` pulls the CUDA build,
+# which is several GB and pointless without an NVIDIA GPU + the nvidia-docker
+# runtime. That CPU-only index doesn't reliably serve aarch64 (ARM) wheels
+# though (relevant for e.g. Oracle Cloud's free-tier Ampere A1 shape), so on
+# arm64 this falls back to the default PyPI index instead, which does publish
+# official CPU-only aarch64 wheels directly. If you ARE deploying to a GPU
+# host, drop this whole block and let requirements.txt install the CUDA
+# build from PyPI instead.
+RUN ARCH="$(uname -m)" && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu; \
+    else \
+        pip install --no-cache-dir torch torchvision; \
+    fi
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Only the code the backend actually imports at runtime — not the training
+# scripts' data folders (images/, extreme_cases/, etc.), which stay out of
+# the image entirely (see .dockerignore). The model checkpoint, the SQLite
+# DB, and logs are bind-mounted at runtime instead of copied in — see
+# docker-compose.yml — so the image doesn't balloon and rebuilding the image
+# never risks overwriting real data.
+COPY app/ ./app/
+COPY data/ ./data/
+COPY models/ ./models/
+COPY interpretability/ ./interpretability/
+# Required at runtime, not just for training — app/inference.py does
+# sys.path.insert(..., ROOT / "risk_assessment") and imports llm_explainer
+# straight out of this directory. Leaving it out breaks startup entirely.
+COPY risk_assessment/ ./risk_assessment/
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+    CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)" || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

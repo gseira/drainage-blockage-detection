@@ -1,0 +1,40 @@
+# Backend build context — keep the image to just what app/main.py actually
+# imports at runtime. Everything below is either huge, secret, or training-
+# time only, and none of it belongs in the image.
+
+.git
+.gitignore
+.DS_Store
+.env
+.env.example
+
+__pycache__
+**/__pycache__
+*.pyc
+
+# Bind-mounted at runtime instead — see docker-compose.yml
+monitoring.db
+monitoring.db-*
+logs/
+results/
+
+# Training data / experiment output — not needed by the running app.
+# NOTE: risk_assessment/ is deliberately NOT listed here even though it looks
+# like a training/experiment folder — app/inference.py does
+# `sys.path.insert(..., ROOT / "risk_assessment")` and imports llm_explainer
+# from it directly at runtime. Excluding it breaks the container at startup.
+images/
+extreme_cases/
+finetune_v5_sample/
+tta_validation_v4/
+tta_validation_v4b/
+v4_mistake_review/
+writing/
+evaluation/
+experiments/
+slurm/
+scripts/
+*.docx
+
+# Frontend has its own build context (Flood Watcher/Dockerfile)
+Flood Watcher/

@@ -1,0 +1,212 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Consolas", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-risk-high: var(--risk-high);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-low: var(--risk-low);
+  --color-ok: var(--ok);
+
+  --color-map-land: var(--map-land);
+  --color-map-water: var(--map-water);
+  --color-map-road: var(--map-road);
+  --color-map-route: var(--map-route);
+  --color-map-grid: var(--map-grid);
+}
+
+:root {
+  --radius: 3px;
+
+  /* Slightly warm off-white — not pure white, not grey.
+     Replicates how fluorescent-lit office monitors render backgrounds. */
+  --background: oklch(0.976 0.005 85);
+  --foreground: oklch(0.212 0.009 258);
+  --surface:    oklch(0.984 0.003 82);
+  --surface-2:  oklch(0.970 0.005 85);
+  --panel:      oklch(0.979 0.004 83);
+
+  --card:             oklch(0.984 0.003 82);
+  --card-foreground:  oklch(0.212 0.009 258);
+  --popover:          oklch(0.984 0.003 82);
+  --popover-foreground: oklch(0.212 0.009 258);
+
+  --primary:            oklch(0.230 0.011 258);
+  --primary-foreground: oklch(0.976 0.005 85);
+
+  --secondary:            oklch(0.961 0.006 258);
+  --secondary-foreground: oklch(0.230 0.011 258);
+
+  /* Muted — slightly warm grey, not clean blue-grey */
+  --muted:            oklch(0.961 0.006 80);
+  --muted-foreground: oklch(0.512 0.012 258);
+
+  --accent:            oklch(0.695 0.145 54);
+  --accent-foreground: oklch(0.180 0.022 60);
+
+  --destructive:            oklch(0.552 0.175 25);
+  --destructive-foreground: oklch(0.976 0.005 85);
+
+  /* Borders: very slightly brownish so they don't look pixel-perfect neutral */
+  --border:       oklch(0.883 0.009 78);
+  --border-strong: oklch(0.824 0.011 78);
+  --input:        oklch(0.883 0.009 78);
+  --ring:         oklch(0.695 0.145 54);
+
+  /* Risk colours: slightly desaturated vs typical design systems */
+  --risk-high:   oklch(0.560 0.168 24);
+  --risk-medium: oklch(0.692 0.138 62);
+  --risk-low:    oklch(0.582 0.102 150);
+  --ok:          oklch(0.582 0.102 150);
+
+  --map-land:  oklch(0.961 0.007 90);
+  --map-water: oklch(0.912 0.019 228);
+  --map-road:  oklch(0.872 0.007 258);
+  --map-route: oklch(0.695 0.145 54);
+  --map-grid:  oklch(0.922 0.005 258);
+}
+
+.dark {
+  --background:  oklch(0.160 0.006 258);
+  --foreground:  oklch(0.930 0.005 90);
+  --surface:     oklch(0.180 0.007 258);
+  --surface-2:   oklch(0.167 0.005 258);
+  --panel:       oklch(0.190 0.006 258);
+  --card:        oklch(0.180 0.007 258);
+  --card-foreground: oklch(0.930 0.005 90);
+  --popover:     oklch(0.180 0.007 258);
+  --popover-foreground: oklch(0.930 0.005 90);
+  --primary:     oklch(0.930 0.005 90);
+  --primary-foreground: oklch(0.180 0.007 258);
+  --secondary:   oklch(0.230 0.009 258);
+  --secondary-foreground: oklch(0.930 0.005 90);
+  --muted:       oklch(0.230 0.009 258);
+  --muted-foreground: oklch(0.642 0.011 258);
+  --accent:      oklch(0.718 0.150 60);
+  --accent-foreground: oklch(0.160 0.021 60);
+  --destructive: oklch(0.612 0.190 25);
+  --border:      oklch(0.262 0.009 258);
+  --border-strong: oklch(0.332 0.011 258);
+  --input:       oklch(0.262 0.009 258);
+  --ring:        oklch(0.718 0.150 60);
+  --map-land:    oklch(0.210 0.006 258);
+  --map-water:   oklch(0.255 0.017 230);
+  --map-road:    oklch(0.335 0.008 258);
+  --map-grid:    oklch(0.235 0.006 258);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+
+  html, body, #root { height: 100%; }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    /* subpixel-antialiased is what real deployed browser apps look like
+       on non-retina monitors. "antialiased" is the showroom setting. */
+    -webkit-font-smoothing: subpixel-antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Film-grain noise — fixed, non-interactive, z-index above everything.
+   * Opacity 0.028 is barely perceptible but enough to break the "vector flat" look.
+   * This is the single biggest tell between a screenshot and a mockup.
+   */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.028;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--color-accent) 30%, transparent);
+    color: var(--color-foreground);
+  }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--color-foreground) 13%, transparent);
+    border: 3px solid var(--color-background);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--color-foreground) 22%, transparent);
+  }
+}
+
+@utility mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum", "zero", "ss01";
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility hairline {
+  border-width: 1px;
+  border-color: var(--color-border);
+}
+
+@utility label-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+/* Faint drop shadow — real dashboards use box-shadow, not flat borders alone */
+@utility panel-shadow {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}
+
+/* Left rail inset depth */
+@utility rail-shadow {
+  box-shadow: inset -1px 0 0 0 var(--color-border-strong), 2px 0 5px -2px rgb(0 0 0 / 0.04);
+}

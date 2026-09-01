@@ -1,0 +1,22 @@
+:8443 {
+	# HTTP Basic Auth in front of everything — the browser will show a native
+	# username/password prompt before any page loads. Replace REPLACE_WITH_HASH
+	# with the output of:
+	#   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'your-chosen-password'
+	basic_auth {
+		demo $2a$14$Tz/jJDQFvBPIzty2sfDJV.W.VgkJ7CtjHFHk63vM67hnMD2Y/w7wi
+	}
+
+	# API calls from the frontend (VITE_API_BASE=.../api) land here — strip
+	# the /api prefix and forward to the backend container, which knows
+	# nothing about that prefix itself.
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else (the actual web app pages) goes to the frontend
+	# container.
+	handle {
+		reverse_proxy frontend:5173
+	}
+}
