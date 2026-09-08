@@ -190,6 +190,19 @@ class LLMExplainer:
                 ],
             }],
             "max_tokens": max_tokens,
+            # qwen-3.8-27b defaults to reasoning_effort="high" -- it spends
+            # its *entire* max_tokens budget on hidden chain-of-thought
+            # (returned in a "reasoning" field) before ever writing the
+            # actual answer, so with max_tokens=150 it hit finish_reason
+            # "length" while still reasoning and the response had no
+            # "content" field at all (confirmed via a raw-response dump on
+            # 2026-09-08 -- this is a known "overthinking" issue with this
+            # model, not specific to this prompt). Since this app only
+            # wants a short, deterministic explanation/YES-NO answer, not
+            # visible chain-of-thought, disable reasoning outright so
+            # "content" is populated directly within the existing token
+            # budgets.
+            "reasoning_effort": "none",
         }
         req = urllib.request.Request(
             CEREBRAS_ENDPOINT,
@@ -208,7 +221,23 @@ class LLMExplainer:
             try:
                 with urllib.request.urlopen(req, timeout=30) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
-                    return body["choices"][0]["message"]["content"].strip()
+                    message = body["choices"][0]["message"]
+                    content = message.get("content")
+                    if not content:
+                        # Belt-and-suspenders: reasoning_effort="none" above
+                        # should prevent this, but if Cerebras ever ignores
+                        # it (or ships a future model with the same
+                        # overthinking behaviour), fail with something
+                        # actionable in the logs instead of a bare
+                        # KeyError: 'content' that gives no clue why.
+                        finish_reason = body["choices"][0].get("finish_reason")
+                        raise RuntimeError(
+                            f"Cerebras response had no 'content' (finish_reason="
+                            f"{finish_reason!r}, message keys={list(message.keys())}) "
+                            f"-- the model likely spent its whole token budget on "
+                            f"hidden reasoning; see reasoning_effort in the request."
+                        )
+                    return content.strip()
             except urllib.error.HTTPError as e:
                 if attempt < max_retries - 1 and e.code in (429, 500, 502, 503):
                     wait = 2 ** (attempt + 2)   # 4s, 8s, 16s, 32s

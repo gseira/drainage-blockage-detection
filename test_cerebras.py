@@ -28,13 +28,28 @@ if not API_KEY:
     print("Set CEREBRAS_API_KEY first, e.g.:\n  CEREBRAS_API_KEY=csk-xxxxx python3 test_cerebras.py\n(or add it to .env in this folder)")
     sys.exit(1)
 
-# A real blocked-drainage photo already in this project — swap the path if
-# you want to try a different one.
-IMAGE_PATH = os.path.expanduser(
-    "~/Desktop/dissertation/images/cornwall_LauncestonWooda_cam1/blocked/reviewed_27699.jpg"
-)
+# A real blocked-drainage photo already in this project. Overridable via
+# argv[1] (e.g. `python3 test_cerebras.py /root/dissertation/images/.../foo.jpg`)
+# since the default path is a dev-machine path (~/Desktop/dissertation/...)
+# that won't exist on a deployment server -- in that case we fall back to
+# searching this script's own directory (and CWD) for any *.jpg under an
+# images/ folder, so this still works out-of-the-box on the droplet.
+if len(sys.argv) > 1:
+    IMAGE_PATH = sys.argv[1]
+else:
+    IMAGE_PATH = os.path.expanduser(
+        "~/Desktop/dissertation/images/cornwall_LauncestonWooda_cam1/blocked/reviewed_27699.jpg"
+    )
+    if not os.path.exists(IMAGE_PATH):
+        import glob
+        here = os.path.dirname(os.path.abspath(__file__))
+        candidates = glob.glob(os.path.join(here, "images", "**", "*.jpg"), recursive=True)
+        if candidates:
+            IMAGE_PATH = candidates[0]
+
 if not os.path.exists(IMAGE_PATH):
-    print(f"Couldn't find {IMAGE_PATH} — edit IMAGE_PATH in this script to point at any real .jpg you have.")
+    print(f"Couldn't find {IMAGE_PATH} and no images/**/*.jpg found nearby.")
+    print("Pass a real .jpg path as an argument: python3 test_cerebras.py /path/to/image.jpg")
     sys.exit(1)
 
 with open(IMAGE_PATH, "rb") as f:
@@ -62,6 +77,10 @@ payload = {
         }
     ],
     "max_tokens": 150,
+    # qwen-3.8-27b defaults to reasoning_effort="high" and burns its whole
+    # max_tokens budget on hidden chain-of-thought before writing "content"
+    # -- disable it so we get a direct answer within the token budget.
+    "reasoning_effort": "none",
 }
 
 req = urllib.request.Request(
@@ -84,11 +103,19 @@ start = time.time()
 try:
     with urllib.request.urlopen(req, timeout=30) as resp:
         elapsed = time.time() - start
-        body = json.loads(resp.read().decode("utf-8"))
-        text = body["choices"][0]["message"]["content"]
+        raw = resp.read().decode("utf-8")
+        body = json.loads(raw)
+        # Print the full raw JSON first, always -- if the response shape
+        # doesn't have choices[0].message.content the way we expect (e.g. a
+        # reasoning model that uses a different field name), this is what
+        # actually shows us the real shape instead of just KeyError: 'content'.
+        print(f"\n--- Raw response JSON ({elapsed:.2f}s) ---")
+        print(json.dumps(body, indent=2))
+        message = body["choices"][0]["message"]
+        text = message.get("content") or message.get("reasoning_content") or "<no content or reasoning_content field>"
         usage = body.get("usage", {})
-        print(f"\n--- Response ({elapsed:.2f}s) ---")
-        print(text.strip())
+        print(f"\n--- Extracted text ---")
+        print(text.strip() if isinstance(text, str) else text)
         print(f"\n--- Token usage ---\n{usage}")
 except urllib.error.HTTPError as e:
     elapsed = time.time() - start
