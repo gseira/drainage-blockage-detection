@@ -75,13 +75,32 @@ DB_PATH          = os.getenv("DB_PATH", str(Path(__file__).parent.parent / "moni
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "15"))   # minutes
 BASE_URL         = "https://eacornwallwebcams.org"
 
-# Each row stores up to three base64 images (original/overlay/heatmap) plus an
-# embedding BLOB — at 56 cameras swept every MONITOR_INTERVAL minutes this
-# grows the DB by tens of GB over a few weeks. RESULTS_RETENTION_DAYS bounds
-# it; 30 days previously let the file grow past the droplet's disk (48GB on a
-# 58GB volume, 2026-08-28 incident) with no periodic VACUUM to reclaim freed
-# pages, so this defaults much lower now.
-RESULTS_RETENTION_DAYS = int(os.getenv("RESULTS_RETENTION_DAYS", "7"))
+# Each row can store up to three base64 images (original/overlay/heatmap)
+# plus an embedding BLOB — those are what make monitoring.db grow fast (56+
+# cameras swept every MONITOR_INTERVAL minutes). But nothing in this app
+# actually needs those heavy columns for more than a day or two:
+#   - /results/latest, /results/latest-by-location, and the scan-consistency
+#     / correction-memory overrides (_get_previous_scan) only ever read the
+#     SINGLE MOST RECENT row per camera.
+#   - /results/history and /results/stats (the metrics/trend page) only need
+#     the lightweight scalar columns (risk, p_blocked, timestamps) over time
+#     -- never the images.
+# So FULL_IMAGE_RETENTION_HOURS strips overlay_b64/heatmap_b64/original_b64/
+# embedding from a row once it's older than this (see _strip_old_images),
+# while keeping the row itself (and its scalar columns) around for the trend
+# chart. That keeps the DB's real disk footprint roughly flat regardless of
+# how long the app has been running, rather than growing without bound.
+# RESULTS_RETENTION_DAYS is just the final full-row cleanup; once rows are
+# stripped down to a few hundred bytes each, that can be generous. (30 days
+# of full, unstripped rows previously filled a droplet's disk -- 48GB on a
+# 58GB volume, 2026-08-28 incident -- and the follow-up fix that only
+# shortened RESULTS_RETENTION_DAYS to 7 days was not enough on its own:
+# 7 days of full-resolution images across 56+ cameras swept every
+# MONITOR_INTERVAL minutes still grew past 38GB on the same 57GB volume.
+# Splitting image-stripping from row-deletion, as below, is what actually
+# keeps disk usage flat.)
+FULL_IMAGE_RETENTION_HOURS = int(os.getenv("FULL_IMAGE_RETENTION_HOURS", "48"))
+RESULTS_RETENTION_DAYS     = int(os.getenv("RESULTS_RETENTION_DAYS", "180"))
 
 # ── Camera list ───────────────────────────────────────────────────────────────
 # Each entry: name, campath, region, base_url, gallery_prefix
@@ -540,11 +559,34 @@ async def _init_db() -> None:
     log.info("[db] Database ready at %s", DB_PATH)
 
 
+async def _strip_old_images(db) -> None:
+    """
+    Null out the heavy columns (overlay/heatmap/original images + the
+    embedding blob) on rows older than FULL_IMAGE_RETENTION_HOURS, while
+    leaving the row itself -- and its lightweight scalar columns (risk,
+    p_blocked, explanation, timestamps) -- in place for /results/history and
+    /results/stats. See FULL_IMAGE_RETENTION_HOURS's docstring above for why
+    this is safe: nothing reads images/embeddings from a row that old.
+    Does NOT commit -- caller commits alongside its own writes.
+    """
+    await db.execute(
+        "UPDATE results SET overlay_b64 = '', heatmap_b64 = '', original_b64 = NULL, embedding = NULL "
+        "WHERE created_at < datetime('now', ?) "
+        "AND (overlay_b64 != '' OR heatmap_b64 != '' OR original_b64 IS NOT NULL OR embedding IS NOT NULL)",
+        (f"-{FULL_IMAGE_RETENTION_HOURS} hours",),
+    )
+
+
 async def _save_result(
     name: str, campath: str, captured_at: str, result: dict,
     embedding: Optional[np.ndarray] = None,
 ) -> None:
-    """Persist a single inference result. Prunes rows older than 30 days."""
+    """
+    Persist a single inference result. Also runs the two-tier prune inline
+    (strip images off old rows, delete very old rows) as a safety net for
+    however long it's been since the last save/maintenance run — see
+    FULL_IMAGE_RETENTION_HOURS / RESULTS_RETENTION_DAYS above.
+    """
     # Store the original frame for BLOCKED, FLAGGED, AND LOW rows now
     # (2026-07-08) — Mark Blocked/Mark Clear is no longer restricted to
     # FLAGGED results; catching a CONFIDENTLY WRONG call (e.g. the model
@@ -581,11 +623,19 @@ async def _save_result(
                 embedding_bytes,
             ),
         )
-        # Keep the DB lean: drop rows older than RESULTS_RETENTION_DAYS.
-        # This alone only frees pages for SQLite to reuse internally — it
-        # does not shrink the file on disk. See _db_maintenance() for the
-        # periodic incremental_vacuum that actually returns that space to
+        # Keep the DB lean, on every single save rather than only once a
+        # day, so growth stays bounded even if the app is never running at
+        # _db_maintenance()'s scheduled time:
+        #   1. Strip images/embedding off rows older than
+        #      FULL_IMAGE_RETENTION_HOURS -- this is what actually keeps
+        #      disk usage flat, since it runs far more often than the final
+        #      delete below and image columns are what's heavy.
+        #   2. Fully drop rows older than RESULTS_RETENTION_DAYS.
+        # Neither shrinks the file on disk by itself — that only frees pages
+        # for SQLite to reuse internally. See _db_maintenance() for the
+        # periodic incremental_vacuum that actually returns freed space to
         # the OS.
+        await _strip_old_images(db)
         await db.execute(
             "DELETE FROM results WHERE created_at < datetime('now', ?)",
             (f"-{RESULTS_RETENTION_DAYS} days",),
@@ -595,17 +645,24 @@ async def _save_result(
 
 async def _db_maintenance() -> None:
     """
-    Daily housekeeping job. Runs the same retention prune as a safety net
-    (in case the app was down when a sweep would normally have pruned), then
+    Daily housekeeping job. Runs the same two-tier prune as the inline
+    safety net in _save_result() (image-stripping + full-row delete — see
+    FULL_IMAGE_RETENTION_HOURS above for why this is split in two), then
     PRAGMA incremental_vacuum to actually hand freed pages back to the OS —
-    plain DELETE only frees pages for SQLite to reuse internally, it doesn't
-    shrink the file. Logs the file size before/after so shrinkage is visible
-    in the container logs.
+    plain DELETE/UPDATE only free pages for SQLite to reuse internally, they
+    don't shrink the file. Logs the file size before/after so shrinkage is
+    visible in the container logs.
 
     Added 2026-08-28 after monitoring.db grew to 48GB and filled the
     droplet's disk: 30 days of full-resolution image rows across 56 cameras
     swept every MONITOR_INTERVAL minutes was simply too much data for a
-    58GB volume, and nothing was ever returning freed space to the OS.
+    58GB volume, and nothing was ever returning freed space to the OS. Later
+    split into two retention windows (image-stripping vs. full-row delete)
+    once it became clear nothing actually needs images beyond a day or two —
+    see FULL_IMAGE_RETENTION_HOURS. (The interim fix that only shortened
+    RESULTS_RETENTION_DAYS to 7 days was not enough on its own — the DB
+    still grew past 38GB on the same 57GB volume, because full-resolution
+    images were still being kept for the entire 7-day window.)
 
     Also prunes the corrections table (app/correction_memory.py) the same
     way, since it was the one other DB table with unbounded growth and no
@@ -622,6 +679,7 @@ async def _db_maintenance() -> None:
     try:
         before = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
         async with aiosqlite.connect(DB_PATH) as db:
+            await _strip_old_images(db)
             await db.execute(
                 "DELETE FROM results WHERE created_at < datetime('now', ?)",
                 (f"-{RESULTS_RETENTION_DAYS} days",),
@@ -631,9 +689,9 @@ async def _db_maintenance() -> None:
             await db.commit()
         after = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
         log.info(
-            "[db_maintenance] pruned rows older than %d days, incremental_vacuum ran — "
-            "file size %.1f MB -> %.1f MB",
-            RESULTS_RETENTION_DAYS, before / 1e6, after / 1e6,
+            "[db_maintenance] stripped images off rows older than %d hours, pruned rows "
+            "older than %d days, incremental_vacuum ran — file size %.1f MB -> %.1f MB",
+            FULL_IMAGE_RETENTION_HOURS, RESULTS_RETENTION_DAYS, before / 1e6, after / 1e6,
         )
     except Exception as exc:
         log.warning("[db_maintenance] failed: %s", exc)
