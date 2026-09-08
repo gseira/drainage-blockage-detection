@@ -51,7 +51,7 @@ prompt_text = (
 )
 
 payload = {
-    "model": "gemma-4-31b",
+    "model": "qwen-3.8-27b",
     "messages": [
         {
             "role": "user",
@@ -79,7 +79,7 @@ req = urllib.request.Request(
     method="POST",
 )
 
-print(f"Sending {IMAGE_PATH} to Cerebras (gemma-4-31b)...")
+print(f"Sending {IMAGE_PATH} to Cerebras (qwen-3.8-27b)...")
 start = time.time()
 try:
     with urllib.request.urlopen(req, timeout=30) as resp:

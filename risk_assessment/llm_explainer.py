@@ -1,7 +1,7 @@
 """
 llm_explainer.py
 ----------------
-Uses Cerebras's gemma-4-31b vision model to generate a natural language
+Uses Cerebras's qwen-3.8-27b vision model to generate a natural language
 explanation of a Grad-CAM overlay image.
 
 Cerebras receives:
@@ -146,20 +146,23 @@ def _coverage_bucket(coverage_pct: float) -> str:
 
 class LLMExplainer:
     """
-    Wraps Cerebras's gemma-4-31b vision model to explain Grad-CAM overlay
+    Wraps Cerebras's qwen-3.8-27b vision model to explain Grad-CAM overlay
     images. test_cerebras.py is the standalone script this was validated
     against — same endpoint, same headers, same model.
 
     Args:
         api_key:    Cerebras API key. If None, reads from CEREBRAS_API_KEY
                     env var.
-        model_name: Cerebras vision model (default: gemma-4-31b).
+        model_name: Cerebras vision model (default: qwen-3.8-27b). Must be a model
+                    on Cerebras's public shared tier with image-input support --
+                    gemma-4-31b (the original choice) moved to Dedicated
+                    Endpoints only and now 404s on a normal API key.
     """
 
     def __init__(
         self,
         api_key: str = None,
-        model_name: str = "gemma-4-31b",
+        model_name: str = "qwen-3.8-27b",
     ):
         key = api_key or os.getenv("CEREBRAS_API_KEY")
         if not key:
