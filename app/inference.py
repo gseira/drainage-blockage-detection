@@ -368,12 +368,12 @@ class InferencePipeline:
                           all, for 7x the inference cost. Kept as an option
                           rather than deleted in case a future, more
                           aggressive perturbation set is worth re-testing.
-        use_llm:         If True (default), call the Groq LLM for a written
+        use_llm:         If True (default), call the Cerebras LLM for a written
                           explanation on BLOCKED predictions. Set False to
                           skip that entirely and use a placeholder explanation
                           instead — for batch evaluation/testing scripts that
                           only care about the prediction/probability and
-                          would otherwise burn through the Groq API quota
+                          would otherwise burn through the Cerebras API quota
                           (and slow down a few-hundred-image test run) for
                           text nothing is reading.
         preserve_aspect: If False (default), squash every image to a square
@@ -673,7 +673,7 @@ class InferencePipeline:
                     explanation = "\n".join(lines).strip()
             except Exception as llm_err:
                 print(f"  [LLM unavailable] {llm_err}")
-                explanation = "LLM explanation unavailable — Groq API could not be reached. Retry later."
+                explanation = "LLM explanation unavailable — Cerebras API could not be reached. Retry later."
 
         return {
             "prediction":       prediction,
@@ -826,7 +826,7 @@ class InferencePipeline:
                     explanation = "\n".join(lines).strip()
             except Exception as llm_err:
                 print(f"  [LLM unavailable] {llm_err}")
-                explanation = "LLM explanation unavailable — Groq API could not be reached. Retry later."
+                explanation = "LLM explanation unavailable — Cerebras API could not be reached. Retry later."
 
         return {
             "overlay_b64":      _pil_to_base64(overlay),

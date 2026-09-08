@@ -2,8 +2,7 @@
 llm_explainer.py
 ----------------
 Uses Cerebras's gemma-4-31b vision model to generate a natural language
-explanation of a Grad-CAM overlay image. (Previously used Groq — see git
-history / CEREBRAS_MIGRATION note below for why the switch was made.)
+explanation of a Grad-CAM overlay image.
 
 Cerebras receives:
     - The Grad-CAM overlay (original image blended with heatmap)
@@ -148,14 +147,8 @@ def _coverage_bucket(coverage_pct: float) -> str:
 class LLMExplainer:
     """
     Wraps Cerebras's gemma-4-31b vision model to explain Grad-CAM overlay
-    images.
-
-    Previously ran on Groq (qwen/qwen3.6-27b, and before that
-    meta-llama/llama-4-scout-17b-16e-instruct, deprecated by Groq on
-    2026-06-17). Switched to Cerebras after testing showed it handles the
-    same grounded prompt correctly and paid billing was set up on the
-    account (test_cerebras.py is the standalone script this was validated
-    against — same endpoint, same headers, same model).
+    images. test_cerebras.py is the standalone script this was validated
+    against — same endpoint, same headers, same model.
 
     Args:
         api_key:    Cerebras API key. If None, reads from CEREBRAS_API_KEY

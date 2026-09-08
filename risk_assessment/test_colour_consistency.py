@@ -94,7 +94,7 @@ def main():
                           "the single-pass baseline, for a controlled before/after comparison "
                           "against the default (TTA-on) run.")
     ap.add_argument("--no-llm", action="store_true",
-                     help="Skip the Groq LLM explanation call entirely (this test never reads "
+                     help="Skip the Cerebras LLM explanation call entirely (this test never reads "
                           "the explanation text anyway) — avoids burning API quota and rate-limit "
                           "slowdowns on larger batches.")
     args = ap.parse_args()

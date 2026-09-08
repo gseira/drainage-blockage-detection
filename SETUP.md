@@ -34,15 +34,15 @@ single general model now serves every camera.
 
 ## 4. Set up your own API key
 
-The LLM explanation feature uses Groq. Copy the template and fill in your
+The LLM explanation feature uses Cerebras. Copy the template and fill in your
 OWN key (don't reuse someone else's — it's tied to their account/billing):
 
 ```
 cp .env.example .env
 ```
 
-Then edit `.env` and paste in a real Groq API key (free tier available at
-https://console.groq.com). The app still works without one — it just shows
+Then edit `.env` and paste in a real Cerebras API key (get one at
+https://cloud.cerebras.ai). The app still works without one — it just shows
 a placeholder explanation instead of a full write-up for BLOCKED results.
 
 ## 5. Install Python dependencies
